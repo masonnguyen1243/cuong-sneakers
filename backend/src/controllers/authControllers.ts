@@ -6,12 +6,18 @@ import { v4 as uuidv4 } from "uuid";
 import { generateAccessToken, generateRefreshToken } from "~/utils/jwt";
 import ms from "ms";
 import { CookieOptions } from "express";
+import SendEmail from "~/utils/sendEmail";
 
 const register = async (req: Request, res: Response): Promise<any> => {
   try {
     const { name, email, password } = req.body;
     if (!name || !email || !password) {
       return res.status(StatusCodes.NOT_FOUND).json({ success: false, message: "Fields required!" });
+    }
+
+    const existsUser = await UserModel.findOne({ email });
+    if (existsUser) {
+      return res.status(StatusCodes.NOT_ACCEPTABLE).json({ success: false, message: "User already exists" });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -23,9 +29,29 @@ const register = async (req: Request, res: Response): Promise<any> => {
       verifyToken: uuidv4(),
     });
 
+    if (password.length < 8) {
+      return res.status(StatusCodes.NOT_ACCEPTABLE).json({
+        success: false,
+        message: "Password must include at least 1 letter, a number, and at least 8 characters.",
+      });
+    }
+
     user.save();
 
-    return res.status(StatusCodes.CREATED).json({ success: true, message: "Registration successfully!", data: user });
+    //Send Email
+    const verificationLink = `http://localhost:5173/account/verification?email=${user.email}&token=${user.verifyToken}`;
+    const customSubject = "Please verify your email before using our service";
+    const htmlContent = `
+      <h3>Here is your verification link</h3>
+      <h3>${verificationLink}</h3>
+      <h3>Sincerely, <br/> - Cuong Sneakers - </h3>
+    `;
+
+    await SendEmail(user.email, customSubject, htmlContent);
+
+    return res
+      .status(StatusCodes.CREATED)
+      .json({ success: true, message: "Registration successfully! Please check email to verify your account!" });
   } catch (error) {
     console.error(`Error in register user`);
 
