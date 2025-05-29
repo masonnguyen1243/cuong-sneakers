@@ -127,4 +127,17 @@ const verifyAccount = async (req: Request, res: Response): Promise<any> => {
   }
 };
 
-export const authControllers = { register, login, verifyAccount };
+const logout = async (req: Request, res: Response): Promise<any> => {
+  try {
+    res.clearCookie("accessToken");
+    res.clearCookie("refreshToken");
+
+    return res.status(StatusCodes.OK).json({ success: true, message: "Logged out successfully!" });
+  } catch (error) {
+    console.error(`Error in verifyAccount user`);
+
+    return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ success: false, message: (error as Error).message });
+  }
+};
+
+export const authControllers = { register, login, verifyAccount, logout };
