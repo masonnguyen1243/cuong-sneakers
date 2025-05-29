@@ -3,6 +3,9 @@ import { StatusCodes } from "http-status-codes";
 import { Request, Response } from "express";
 import bcrypt from "bcrypt";
 import { v4 as uuidv4 } from "uuid";
+import { generateAccessToken, generateRefreshToken } from "~/utils/jwt";
+import ms from "ms";
+import { CookieOptions } from "express";
 
 const register = async (req: Request, res: Response): Promise<any> => {
   try {
@@ -24,10 +27,67 @@ const register = async (req: Request, res: Response): Promise<any> => {
 
     return res.status(StatusCodes.CREATED).json({ success: true, message: "Registration successfully!", data: user });
   } catch (error) {
-    console.error(`Error in register`);
+    console.error(`Error in register user`);
 
     return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ success: false, message: (error as Error).message });
   }
 };
 
-export const authControllers = { register };
+const login = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(StatusCodes.NOT_FOUND).json({ success: false, message: "Fields required!" });
+    }
+
+    const user = await UserModel.findOne({ email });
+    if (!user) {
+      return res
+        .status(StatusCodes.NON_AUTHORITATIVE_INFORMATION)
+        .json({ success: false, message: "Invalid email and/or password" });
+    }
+
+    const isMatchPassword = await bcrypt.compare(password, user.password);
+    if (!isMatchPassword) {
+      return res
+        .status(StatusCodes.NON_AUTHORITATIVE_INFORMATION)
+        .json({ success: false, message: "Invalid email and/or password" });
+    }
+
+    if (!user.isActive) {
+      return res
+        .status(StatusCodes.UNAUTHORIZED)
+        .json({ success: false, message: "Your account is not active. Please check your email!" });
+    }
+
+    const accessToken = generateAccessToken(user._id, user.role);
+    const refreshToken = generateRefreshToken(user._id, user.role);
+
+    const cookieOptions: CookieOptions = {
+      httpOnly: true,
+      secure: true,
+      sameSite: "none",
+      maxAge: ms("14 days"),
+    };
+
+    res.cookie("accessToken", accessToken, cookieOptions);
+    res.cookie("refreshToken", refreshToken, cookieOptions);
+
+    return res.status(StatusCodes.OK).json({
+      success: true,
+      message: "Logged in successfully!",
+      data: {
+        name: user.name,
+        email: user.email,
+        accessToken,
+        refreshToken,
+      },
+    });
+  } catch (error) {
+    console.error(`Error in login user`);
+
+    return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ success: false, message: (error as Error).message });
+  }
+};
+
+export const authControllers = { register, login };
