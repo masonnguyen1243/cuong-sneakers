@@ -90,4 +90,41 @@ const login = async (req: Request, res: Response): Promise<any> => {
   }
 };
 
-export const authControllers = { register, login };
+const verifyAccount = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const { email, token } = req.body;
+    if (!email || !token) {
+      return res.status(StatusCodes.NOT_FOUND).json({ success: false, message: "Fields required" });
+    }
+
+    const user = await UserModel.findOne({ email });
+    if (!user) {
+      return res.status(StatusCodes.NOT_FOUND).json({ success: false, message: "User not found" });
+    }
+
+    if (user.isActive) {
+      return res
+        .status(StatusCodes.NOT_ACCEPTABLE)
+        .json({ success: false, message: "Your account is already verify. Please login to enjoy our service!" });
+    }
+
+    if (token !== user.verifyToken) {
+      return res.status(StatusCodes.NOT_ACCEPTABLE).json({ success: false, message: "Invalid Token" });
+    }
+
+    user.isActive = true;
+    user.verifyToken = null;
+
+    user.save();
+
+    return res
+      .status(StatusCodes.OK)
+      .json({ success: true, message: "Verification successfully. Please login to enjoy our service", data: user });
+  } catch (error) {
+    console.error(`Error in verifyAccount user`);
+
+    return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ success: false, message: (error as Error).message });
+  }
+};
+
+export const authControllers = { register, login, verifyAccount };
