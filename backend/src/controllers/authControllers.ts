@@ -7,6 +7,8 @@ import { generateAccessToken, generateRefreshToken } from "~/utils/jwt";
 import ms from "ms";
 import { CookieOptions } from "express";
 import SendEmail from "~/utils/sendEmail";
+import { CloudinaryProvider } from "~/utils/cloudinary";
+import { after } from "node:test";
 
 const register = async (req: Request, res: Response): Promise<any> => {
   try {
@@ -160,10 +162,35 @@ const logout = async (req: Request, res: Response): Promise<any> => {
 
     return res.status(StatusCodes.OK).json({ success: true, message: "Logged out successfully!" });
   } catch (error) {
-    console.error(`Error in verifyAccount user`);
+    console.error(`Error in logout user`);
 
     return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ success: false, message: (error as Error).message });
   }
 };
 
-export const authControllers = { register, login, verifyAccount, logout };
+const changeAvatarUser = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const avatar = req.file;
+    const userId = req.user?.id;
+    const user = await UserModel.findOne({ _id: userId });
+
+    const uploadResult = await CloudinaryProvider.streamUpload(avatar?.buffer, "users");
+    console.log(uploadResult);
+
+    const updatedUser = await UserModel.findOneAndUpdate(
+      user._id,
+      {
+        avatar: uploadResult.secure_url,
+      },
+      { new: true },
+    );
+
+    return res.status(StatusCodes.OK).json({ success: true, message: "Change avatar successfully", data: updatedUser });
+  } catch (error) {
+    console.error(`Error in changeAvatarUser user`);
+
+    return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ success: false, message: (error as Error).message });
+  }
+};
+
+export const authControllers = { register, login, verifyAccount, logout, changeAvatarUser };

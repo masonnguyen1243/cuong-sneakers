@@ -20,6 +20,7 @@ const UserSchema = new mongoose.Schema(
     },
     avatar: {
       type: String,
+      default: "https://static-00.iconduck.com/assets.00/avatar-default-symbolic-icon-479x512-n8sg74wg.png",
     },
     role: {
       type: String,
